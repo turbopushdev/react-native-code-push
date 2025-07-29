@@ -1,16 +1,17 @@
 {
   "name": "@turbopush/react-native-code-push",
-  "version": "9.0.1",
+  "version": "10.2.2",
   "description": "React Native plugin for the CodePush service",
   "main": "CodePush.js",
   "typings": "typings/react-native-code-push.d.ts",
-  "homepage": "https://microsoft.github.io/code-push",
+  "homepage": "https://turbopush.org",
   "keywords": [
     "react-native",
     "code",
-    "push"
+    "push",
+    "turbopush"
   ],
-  "author": "Microsoft Corporation",
+  "author": "Turbopush",
   "license": "MIT",
   "scripts": {
     "clean": "shx rm -rf bin",
@@ -20,19 +21,28 @@
     "test": "npm run build:tests && npm run test:setup && npm run test:fast",
     "test:android": "npm run build:tests && npm run test:setup:android && npm run test:fast:android",
     "test:ios": "npm run build:tests && npm run test:setup:ios && npm run test:fast:ios",
+    "test:expo:android": "npm run build:tests && npm run test:setup:expo:android && npm run test:fast:expo:android",
+    "test:expo:ios": "npm run build:tests && npm run test:setup:expo:ios && npm run test:fast:expo:ios",
+    "test:oldArch": "export TEST_OLD_ARCH=true && npm run build:tests && npm run test:setup && npm run test:fast",
+    "test:oldArch:android": "export TEST_OLD_ARCH=true && npm run build:tests && npm run test:setup:android && npm run test:fast:android",
+    "test:oldArch:ios": "export TEST_OLD_ARCH=true && npm run build:tests && npm run test:setup:ios && npm run test:fast:ios",
     "test:setup": "mocha --recursive bin/test --android --ios --setup",
     "test:setup:android": "mocha --recursive bin/test --android --setup",
     "test:setup:ios": "mocha --recursive bin/test --ios --setup",
+    "test:setup:expo:android": "mocha --recursive bin/test --android --setup --expo",
+    "test:setup:expo:ios": "mocha --recursive bin/test --ios --setup --expo",
     "test:fast": "mocha --recursive bin/test --android --ios",
     "test:fast:android": "mocha --recursive bin/test --android",
     "test:fast:ios": "mocha --recursive bin/test --ios",
+    "test:fast:expo:android": "mocha --recursive bin/test --android --expo",
+    "test:fast:expo:ios": "mocha --recursive bin/test --ios --expo",
     "test:debugger:android": "mocha --recursive --inspect-brk=0.0.0.0 bin/test --android",
     "test:debugger:ios": "mocha --recursive --inspect-brk=0.0.0.0 bin/test --ios",
     "tslint": "tslint -c tslint.json test/**/*.ts"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/turbopushdev/react-native-code-push"
+    "url": "git+https://github.com/turbopushdev/react-native-code-push.git"
   },
   "dependencies": {
     "code-push": "4.2.3",
@@ -73,8 +83,11 @@
       ]
     },
     "commands": {
-      "postlink": "node node_modules/react-native-code-push/scripts/postlink/run",
-      "postunlink": "node node_modules/react-native-code-push/scripts/postunlink/run"
+      "postlink": "node node_modules/@turbopush/react-native-code-push/scripts/postlink/run",
+      "postunlink": "node node_modules/@turbopush/react-native-code-push/scripts/postunlink/run"
     }
+  },
+  "bugs": {
+    "url": "https://github.com/turbopushdev/react-native-code-push/issues"
   }
 }

@@ -78,21 +78,34 @@ class RNAndroid extends Platform.Android implements RNPlatform {
      */
     installPlatform(projectDirectory: string): Q.Promise<void> {
         const innerprojectDirectory: string = path.join(projectDirectory, TestConfig.TestAppName);
-        const gradleContent: string = slash(path.join(innerprojectDirectory, "node_modules", "react-native-code-push", "android", "codepush.gradle"));
+        const AndroidManifest = path.join(innerprojectDirectory, "android", "app", "src", "main", "AndroidManifest.xml");
+
+        if (TestConfig.isExpoApp) {
+            const androidMainActivityPath = path.join(innerprojectDirectory, "android", "app", "src", "main", "java", "com", "testcodepush", "MainActivity.kt");
+
+            // we use hard-coded deployment key and server url in app.json
+            return Q.Promise<void>((resolve, reject) => {
+                TestUtil.replaceString(androidMainActivityPath, "\"main\"", `"${TestConfig.TestAppName}"`);
+                TestUtil.replaceString(AndroidManifest, "android:allowBackup=\"true\"", "android:allowBackup=\"true\"" + "\n\t" + "android:usesCleartextTraffic=\"true\"");
+                resolve(null);
+            });
+        }
+
+        const gradleContent: string = slash(path.join(innerprojectDirectory, "node_modules", "@turbopush/react-native-code-push", "android", "codepush.gradle"));
 
         //// Set up gradle to build CodePush with the app
         // Add CodePush to android/app/build.gradle
         const buildGradle = path.join(innerprojectDirectory, "android", "app", "build.gradle");
 
         TestUtil.replaceString(buildGradle,
-            "apply from: file\\(\"../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle\"\\); applyNativeModulesAppBuildGradle\\(project\\)",
-            "apply from: file(\"../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle\"); applyNativeModulesAppBuildGradle(project)\napply from: \"" + gradleContent + "\"");
+            "apply plugin: \"com.facebook.react\"",
+            "apply plugin: \"com.facebook.react\"\napply from: \"" + gradleContent + "\"");
 
-        // Add CodePush to android/settings.gradle
-        const settingsGradle = path.join(innerprojectDirectory, "android", "settings.gradle");
-        TestUtil.replaceString(settingsGradle,
-            "include ':app'",
-            "include ':app', ':react-native-code-push'\nproject(':react-native-code-push').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-code-push/android/app')");
+        // Disable new architecture
+        if (TestConfig.testOldArch) {
+            const gradleProperties = path.join(innerprojectDirectory, "android", "gradle.properties");
+            TestUtil.replaceString(gradleProperties, "newArchEnabled=true", "newArchEnabled=false");
+        }
 
         //// Set the app version to 1.0.0 instead of 1.0
         // Set the app version to 1.0.0 in android/app/build.gradle
@@ -102,7 +115,6 @@ class RNAndroid extends Platform.Android implements RNPlatform {
 
         //// Replace the MainApplication.java with the correct server url and deployment key
         const string = path.join(innerprojectDirectory, "android", "app", "src", "main", "res", "values", "strings.xml");
-        const AndroidManifest = path.join(innerprojectDirectory, "android", "app", "src", "main", "AndroidManifest.xml");
         TestUtil.replaceString(string, TestUtil.SERVER_URL_PLACEHOLDER, this.getServerUrl());
         TestUtil.replaceString(string, TestUtil.ANDROID_KEY_PLACEHOLDER, this.getDefaultDeploymentKey());
         TestUtil.replaceString(AndroidManifest, "android:allowBackup=\"false\"", "android:allowBackup=\"false\"" + "\n\t" + "android:usesCleartextTraffic=\"true\"");
@@ -125,8 +137,8 @@ class RNAndroid extends Platform.Android implements RNPlatform {
     buildFunction(androidDirectory: string): Q.Promise<void> {
         const gradlewCommand = process.platform === "darwin" || process.platform === "linux" ? "./gradlew" : "gradlew";
         return TestUtil.getProcessOutput(`${gradlewCommand} clean`, { noLogStdOut: true, cwd: androidDirectory })
-                .then(() => TestUtil.getProcessOutput(`${gradlewCommand} assembleRelease --daemon`, { noLogStdOut: true, cwd: androidDirectory }))
-                .then(() => { return null; });
+            .then(() => TestUtil.getProcessOutput(`${gradlewCommand} assembleRelease --daemon`, { noLogStdOut: true, cwd: androidDirectory }))
+            .then(() => { return null; });
     }
 
     /**
@@ -176,30 +188,40 @@ class RNIOS extends Platform.IOS implements RNPlatform {
     installPlatform(projectDirectory: string): Q.Promise<void> {
         const iOSProject: string = path.join(projectDirectory, TestConfig.TestAppName, "ios");
         const infoPlistPath: string = path.join(iOSProject, TestConfig.TestAppName, "Info.plist");
-        const appDelegatePath: string = path.join(iOSProject, TestConfig.TestAppName, "AppDelegate.mm");
+        const appDelegatePath: string = path.join(iOSProject, TestConfig.TestAppName, "AppDelegate.swift");
+        const podfilePath: string = path.join(iOSProject, "Podfile");
 
+        if (TestConfig.isExpoApp) {
+            // we use hard-coded deployment key and server url in app.json
+            return Q.Promise<void>((resolve, reject) => {
+                TestUtil.replaceString(appDelegatePath, "\"main\"", `"${TestConfig.TestAppName}"`);
+                resolve(null);
+            });
+        } else {
+            // Install the Podfile
+            return TestUtil.copyFile(path.join(TestConfig.templatePath, "ios", "Podfile"), podfilePath, true)
+                .then(() => TestUtil.getProcessOutput(`RCT_NEW_ARCH_ENABLED=${TestConfig.testOldArch ? 0 : 1} pod install`, { cwd: iOSProject }))
+                // Put the IOS deployment key in the Info.plist
+                .then(TestUtil.replaceString.bind(undefined, infoPlistPath,
+                    "</dict>\n</plist>",
+                    "<key>CodePushDeploymentKey</key>\n\t<string>" + this.getDefaultDeploymentKey() + "</string>\n\t<key>CodePushServerURL</key>\n\t<string>" + this.getServerUrl() + "</string>\n\t</dict>\n</plist>"))
+                // Set the app version to 1.0.0 instead of 1.0 in the Info.plist
+                .then(TestUtil.replaceString.bind(undefined, infoPlistPath, "1.0", "1.0.0"))
+                // Remove dependence of CFBundleShortVersionString from project.pbxproj
+                .then(TestUtil.replaceString.bind(undefined, infoPlistPath, "\\$\\(MARKETING_VERSION\\)", "1.0.0"))
+                // Fix the linker flag list in project.pbxproj (pod install adds an extra comma)
+                .then(TestUtil.replaceString.bind(undefined, path.join(iOSProject, TestConfig.TestAppName + ".xcodeproj", "project.pbxproj"),
+                    "\"[$][(]inherited[)]\",\\s*[)];", "\"$(inherited)\"\n\t\t\t\t);"))
+                // Add the correct bundle identifier
+                .then(TestUtil.replaceString.bind(undefined, path.join(iOSProject, TestConfig.TestAppName + ".xcodeproj", "project.pbxproj"),
+                    "PRODUCT_BUNDLE_IDENTIFIER = [^;]*", "PRODUCT_BUNDLE_IDENTIFIER = \"" + TestConfig.TestNamespace + "\""))
+                // Copy the AppDelegate.mm to the project
+                .then(TestUtil.copyFile.bind(undefined,
+                    path.join(TestConfig.templatePath, "ios", TestConfig.TestAppName, "AppDelegate.swift"),
+                    appDelegatePath, true))
+                .then(TestUtil.replaceString.bind(undefined, appDelegatePath, TestUtil.CODE_PUSH_TEST_APP_NAME_PLACEHOLDER, TestConfig.TestAppName));
+        }
 
-        // Install the Podfile
-        return TestUtil.getProcessOutput("pod install", { cwd: iOSProject })
-            // Put the IOS deployment key in the Info.plist
-            .then(TestUtil.replaceString.bind(undefined, infoPlistPath,
-                "</dict>\n</plist>",
-                "<key>CodePushDeploymentKey</key>\n\t<string>" + this.getDefaultDeploymentKey() + "</string>\n\t<key>CodePushServerURL</key>\n\t<string>" + this.getServerUrl() + "</string>\n\t</dict>\n</plist>"))
-            // Set the app version to 1.0.0 instead of 1.0 in the Info.plist
-            .then(TestUtil.replaceString.bind(undefined, infoPlistPath, "1.0", "1.0.0"))
-            // Remove dependence of CFBundleShortVersionString from project.pbxproj
-            .then(TestUtil.replaceString.bind(undefined, infoPlistPath, "\\$\\(MARKETING_VERSION\\)", "1.0.0"))
-            // Fix the linker flag list in project.pbxproj (pod install adds an extra comma)
-            .then(TestUtil.replaceString.bind(undefined, path.join(iOSProject, TestConfig.TestAppName + ".xcodeproj", "project.pbxproj"),
-                "\"[$][(]inherited[)]\",\\s*[)];", "\"$(inherited)\"\n\t\t\t\t);"))
-            // Add the correct bundle identifier
-            .then(TestUtil.replaceString.bind(undefined, path.join(iOSProject, TestConfig.TestAppName + ".xcodeproj", "project.pbxproj"),
-                "PRODUCT_BUNDLE_IDENTIFIER = [^;]*", "PRODUCT_BUNDLE_IDENTIFIER = \"" + TestConfig.TestNamespace + "\""))
-            // Copy the AppDelegate.mm to the project
-            .then(TestUtil.copyFile.bind(undefined,
-                path.join(TestConfig.templatePath, "ios", TestConfig.TestAppName, "AppDelegate.mm"),
-                appDelegatePath, true))
-            .then<void>(TestUtil.replaceString.bind(undefined, appDelegatePath, TestUtil.CODE_PUSH_TEST_APP_NAME_PLACEHOLDER, TestConfig.TestAppName));
     }
 
     /**
@@ -267,6 +289,11 @@ class RNProjectManager extends ProjectManager {
 
     /**
      * Copies over the template files into the specified project, overwriting existing files.
+     * 
+     * In Bare React Native App, Codepush configuration is done through native template files. 
+     * 
+     * In Expo App, the copied native template files will be removed with `npx expo prebuild --clean` command later. 
+     * Codepush configuration in native side will be done through expo plugin. 
      */
     public copyTemplate(templatePath: string, projectDirectory: string): Q.Promise<void> {
         function copyDirectoryRecursively(directoryFrom: string, directoryTo: string): Q.Promise<void> {
@@ -307,15 +334,24 @@ class RNProjectManager extends ProjectManager {
         }
         mkdirp.sync(projectDirectory);
 
-        return TestUtil.getProcessOutput("npx react-native init " + appName + " --version 0.71.3 --install-pods", { cwd: projectDirectory, timeout: 30 * 60 * 1000 })
-            .then((e) => { console.log(`"npx react-native init ${appName}" success. cwd=${projectDirectory}`); return e; })
-            .then(this.copyTemplate.bind(this, templatePath, projectDirectory))
-            .then<void>(TestUtil.getProcessOutput.bind(undefined, TestConfig.thisPluginInstallString, { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
-            .then(() => { return null; })
-            .catch((error) => {
-                console.log(`"npx react-native init ${appName} failed". cwd=${projectDirectory}`, error);
-                throw new Error(error);
-            });
+        if (TestConfig.isExpoApp) {
+            return TestUtil.getProcessOutput(`npx create-expo-app@latest ${appName} --template blank`, { cwd: projectDirectory, timeout: 30 * 60 * 1000 })
+                .then((e) => { console.log(`"npx expo init ${appName}" success. cwd=${projectDirectory}`); return e; })
+                .then(this.copyTemplate.bind(this, templatePath, projectDirectory))
+                .then<void>(TestUtil.getProcessOutput.bind(undefined, TestConfig.thisPluginInstallString, { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then(TestUtil.getProcessOutput.bind(undefined, `npx expo prebuild --clean`, { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then(() => { return null; });
+        } else {
+            return TestUtil.getProcessOutput("npx @react-native-community/cli init " + appName + " --version 0.80.1 --install-pods", { cwd: projectDirectory, timeout: 30 * 60 * 1000 })
+                .then((e) => { console.log(`"npx @react-native-community/cli init ${appName}" success. cwd=${projectDirectory}`); return e; })
+                .then(this.copyTemplate.bind(this, templatePath, projectDirectory))
+                .then<void>(TestUtil.getProcessOutput.bind(undefined, TestConfig.thisPluginInstallString, { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then(() => { return null; })
+                .catch((error) => {
+                    console.log(`"npx @react-native-community/cli init ${appName} failed". cwd=${projectDirectory}`, error);
+                    throw new Error(error);
+                });
+        }
     }
 
     /** JSON mapping project directories to the current scenario
@@ -376,10 +412,24 @@ class RNProjectManager extends ProjectManager {
             mkdirp.sync(bundleFolder);
             deferred.resolve(undefined);
         });
-        return deferred.promise
-            .then(TestUtil.getProcessOutput.bind(undefined, "npx react-native bundle --entry-file index.js --platform " + targetPlatform.getName() + " --bundle-output " + bundlePath + " --assets-dest " + bundleFolder + " --dev false",
-                { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
-            .then<string>(TestUtil.archiveFolder.bind(undefined, bundleFolder, "", path.join(projectDirectory, TestConfig.TestAppName, "update.zip"), isDiff));
+
+        if (TestConfig.isExpoApp) {
+            // Using react-native bundle instead of expo export because code-push-cli uses react-native-cli to build the app.
+            return deferred.promise
+                .then(TestUtil.getProcessOutput.bind(undefined, "npx expo prebuild --clean", { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then(TestUtil.getProcessOutput.bind(undefined, "npx expo customize metro.config.js",
+                    { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then(TestUtil.getProcessOutput.bind(undefined, "npm install @react-native-community/cli",
+                    { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then(TestUtil.getProcessOutput.bind(undefined, "npx react-native bundle --entry-file index.js --platform " + targetPlatform.getName() + " --bundle-output " + bundlePath + " --assets-dest " + bundleFolder + " --dev false",
+                    { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then<string>(TestUtil.archiveFolder.bind(undefined, bundleFolder, "", path.join(projectDirectory, TestConfig.TestAppName, "update.zip"), isDiff));
+        } else {
+            return deferred.promise
+                .then(TestUtil.getProcessOutput.bind(undefined, "npx react-native bundle --entry-file index.js --platform " + targetPlatform.getName() + " --bundle-output " + bundlePath + " --assets-dest " + bundleFolder + " --dev false",
+                    { cwd: path.join(projectDirectory, TestConfig.TestAppName) }))
+                .then<string>(TestUtil.archiveFolder.bind(undefined, bundleFolder, "", path.join(projectDirectory, TestConfig.TestAppName, "update.zip"), isDiff));
+        }
     }
 
     /** JSON file containing the platforms the plugin is currently installed for.
