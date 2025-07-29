@@ -3,6 +3,7 @@
 # OSX
 #
 .DS_Store
+.gitconfig
 
 # Xcode
 #
@@ -192,3 +193,6 @@ Examples/testapp_rn
 
 # Android debug build files (conflict ignoring #Visual Studio files)
 !android/app/src/debug/
+
+#CodePushExpoDemoApp
+*.rm

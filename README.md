@@ -1,47 +1,28 @@
-# Archiving this repository
-
-Visual Studio App Center was retired on March 31, 2025, except for its Analytics and Diagnostics features. You can learn more about the retirement and the Analytics and Diagnostics extension [here](https://aka.ms/appcenter/retire). CodePush, along with other App Center features, was also retired on March 31, 2025. Consequently, we are archiving this repository.
-
----
-
-[![appcenterbanner](https://user-images.githubusercontent.com/31293287/32969262-3cc5d48a-cb99-11e7-91bf-fa57c67a371c.png)](http://microsoft.github.io/code-push/)
-
-#### [Sign up With App Center](https://appcenter.ms/signup?utm_source=CodePush&utm_medium=Azure) to use CodePush
-
-## React Native Module for CodePush
-> [!WARNING]
-> React Native CodePush won't support new Architecture. In order to use this plugin on React Native versions starting from 0.76 you will need to [opt out](https://reactnative.dev/blog/2024/10/23/the-new-architecture-is-here#opt-out) from new architecture.
->
-*Note: This README is only relevant to the latest version of our plugin. If you are using an older version, please switch to the relevant tag on [our GitHub repo](https://github.com/microsoft/react-native-code-push) to view the docs for that particular version.*
-
-![Switching tags](https://user-images.githubusercontent.com/42337914/57237511-0835de80-7030-11e9-88fa-64eb200478d0.png)
+# React Native Module for CodePush
+#### [Sign up](https://accounts.turbopush.org/sign-up) to use Turbopush
 
 This plugin provides client-side integration for the [CodePush service](https://microsoft.github.io/code-push/), allowing you to easily add a dynamic update experience to your React Native app(s).
 
 <!-- React Native Catalog -->
 
-* [How does it work?](#how-does-it-work)
-* [Supported React Native Platforms](#supported-react-native-platforms)
-* [Supported Components](#supported-components)
-* [Getting Started](#getting-started)
-    * [iOS Setup](docs/setup-ios.md)
-    * [Android Setup](docs/setup-android.md)
-    * [Windows Setup](docs/setup-windows.md)
-* [Plugin Usage](#plugin-usage)
-    * [Store Guideline Compliance](#store-guideline-compliance)
-* [Releasing Updates](#releasing-updates)
-* [Multi-Deployment Testing](#multi-deployment-testing)
-    * [Android](docs/multi-deployment-testing-android.md)
-    * [iOS](docs/multi-deployment-testing-ios.md)
-* [Dynamic Deployment Assignment](#dynamic-deployment-assignment)
-* [API Reference](#api-reference)
-    * [JavaScript API](docs/api-js.md)
-    * [Objective-C API Reference (iOS)](docs/api-ios.md)
-    * [Java API Reference (Android)](docs/api-android.md)
-* [Debugging / Troubleshooting](#debugging--troubleshooting)
-* [Example Apps / Starters](#example-apps--starters)
-* [Continuous Integration / Delivery](#continuous-integration--delivery)
-* [TypeScript Consumption](#typescript-consumption)
+- [React Native Module for CodePush](#react-native-module-for-codepush)
+      - [Sign up to use Turbopush](#sign-up-to-use-turbopush)
+  - [How does it work?](#how-does-it-work)
+  - [Supported React Native platforms](#supported-react-native-platforms)
+    - [Supported Components](#supported-components)
+  - [Getting Started](#getting-started)
+  - [Plugin Usage](#plugin-usage)
+    - [Store Guideline Compliance](#store-guideline-compliance)
+      - [Google play](#google-play)
+      - [App Store](#app-store)
+  - [Releasing Updates](#releasing-updates)
+    - [Multi-Deployment Testing](#multi-deployment-testing)
+    - [Dynamic Deployment Assignment](#dynamic-deployment-assignment)
+  - [API Reference](#api-reference)
+    - [Example Apps / Starters](#example-apps--starters)
+    - [Debugging / Troubleshooting](#debugging--troubleshooting)
+    - [Continuous Integration / Delivery](#continuous-integration--delivery)
+    - [TypeScript Consumption](#typescript-consumption)
 
 <!-- React Native Catalog -->
 
@@ -59,36 +40,17 @@ In order to ensure that your end users always have a functioning version of your
 
 - iOS (7+)
 - Android (4.1+) on TLS 1.2 compatible devices
-- Windows (UWP)
+- Windows (UWP) - Not Tested. We recommend to use [microsoft/code-push-react-native](https://github.com/microsoft/react-native-code-push) 
 
 We try our best to maintain backwards compatibility of our plugin with previous versions of React Native, but due to the nature of the platform, and the existence of breaking changes between releases, it is possible that you need to use a specific version of the CodePush plugin in order to support the exact version of React Native you are using. The following table outlines which CodePush plugin versions officially support the respective React Native versions:
 
-| React Native version(s) | Supporting CodePush version(s)                        |
-|-------------------------|-------------------------------------------------------|
-| <0.14                   | **Unsupported**                                       |
-| v0.14                   | v1.3 *(introduced Android support)*                   |
-| v0.15-v0.18             | v1.4-v1.6 *(introduced iOS asset support)*            |
-| v0.19-v0.28             | v1.7-v1.17 *(introduced Android asset support)*       |
-| v0.29-v0.30             | v1.13-v1.17 *(RN refactored native hosting code)*     |
-| v0.31-v0.33             | v1.14.6-v1.17 *(RN refactored native hosting code)*   |
-| v0.34-v0.35             | v1.15-v1.17 *(RN refactored native hosting code)*     |
-| v0.36-v0.39             | v1.16-v1.17 *(RN refactored resume handler)*          |
-| v0.40-v0.42             | v1.17 *(RN refactored iOS header files)*              |
-| v0.43-v0.44             | v2.0+ *(RN refactored uimanager dependencies)*        |
-| v0.45                   | v3.0+ *(RN refactored instance manager code)*         |
-| v0.46                   | v4.0+ *(RN refactored js bundle loader code)*         |
-| v0.46-v0.53             | v5.1+ *(RN removed unused registration of JS modules)*|
-| v0.54-v0.55             | v5.3+ *(Android Gradle Plugin 3.x integration)*       |
-| v0.56-v0.58             | v5.4+ *(RN upgraded versions for Android tools)*      |
-| v0.59                   | v5.6+ *(RN refactored js bundle loader code)*         |
-| v0.60-v0.61             | v6.0+ *(RN migrated to Autolinking)*                  |
-| v0.62-v0.64             | v6.2+ *(RN removed LiveReload)*                       |
-| v0.65-v0.70             | v7.0+ *(RN updated iPhone-target-version)*            |
-| v0.71                   | v8.0+ *(RN moved to react-native-gradle-plugin)*      |
+| React Native version(s) | Supporting CodePush version(s)                                                                       |
+|-------------------------|------------------------------------------------------------------------------------------------------|
+| <v0.76                  | **Consider [microsoft/code-push-react-native](https://github.com/microsoft/react-native-code-push)** |
+| v0.76, v0.77, 0.78, 0.79| v10.0+ *(Available for Old/New Architecture)*                                                        |
+| v0.80                   | v10.1+ *(Available for Old/New Architecture)*                                                        |
 
-*NOTE: `react-native-code-push` versions lower than **[v5.7.0](https://github.com/microsoft/react-native-code-push/releases/tag/v5.7.0)** will stop working in the near future. You can find more information in our [documentation](https://github.com/microsoft/code-push/blob/master/migration-notice.md).*
 
-We work hard to respond to new RN releases, but they do occasionally break us. We will update this chart with each RN release, so that users can check to see what our "official" support is.
 
 ### Supported Components
 
@@ -123,7 +85,7 @@ As new core components are released, which support referencing assets, we'll upd
 Once you've followed the general-purpose ["getting started"](https://docs.microsoft.com/en-us/appcenter/distribution/codepush/index) instructions for setting up your CodePush account, you can start CodePush-ifying your React Native app by running the following command from within your app's root directory:
 
 ```shell
-npm install --save react-native-code-push
+yarn add @turbopush/react-native-code-push
 ```
 
 As with all other React Native plugins, the integration experience is different for iOS and Android, so perform the following setup steps depending on which platform(s) you are targeting. Note, if you are targeting both platforms it is recommended to create separate CodePush applications for each platform.
@@ -153,7 +115,7 @@ The simplest way to do this is to "CodePush-ify" your app's root component. To d
   * For class component
 
     ```javascript
-    import codePush from "react-native-code-push";
+    import codePush from "@turbopush/react-native-code-push";
 
     class MyApp extends Component {
     }
@@ -164,7 +126,7 @@ The simplest way to do this is to "CodePush-ify" your app's root component. To d
   * For functional component
 
     ```javascript
-    import codePush from "react-native-code-push";
+    import codePush from "@turbopush/react-native-code-push";
 
     let MyApp: () => React$Node = () => {
     }
@@ -179,7 +141,7 @@ The simplest way to do this is to "CodePush-ify" your app's root component. To d
   * For class component
 
     ```javascript
-    import codePush from "react-native-code-push";
+    import codePush from "@turbopush/react-native-code-push";
 
     @codePush
     class MyApp extends Component {
@@ -189,7 +151,7 @@ The simplest way to do this is to "CodePush-ify" your app's root component. To d
   * For functional component
 
     ```javascript
-    import codePush from "react-native-code-push";
+    import codePush from "@turbopush/react-native-code-push";
 
     const MyApp: () => React$Node = () => {
     }
@@ -253,6 +215,30 @@ MyApp = codePush(codePushOptions)(MyApp);
 If you would like to display an update confirmation dialog (an "active install"), configure when an available update is installed (like force an immediate restart) or customize the update experience in any other way, refer to the [`codePush()`](docs/api-js.md#codepush) API reference for information on how to tweak this default behavior.
 
 *NOTE: If you are using [Redux](http://redux.js.org) and [Redux Saga](https://redux-saga.js.org/), you can alternatively use the [react-native-code-push-saga](http://github.com/lostintangent/react-native-code-push-saga) module, which allows you to customize when `sync` is called in a perhaps simpler/more idiomatic way.*
+
+3. For expo user with CNG(Continuous Native Generation)
+```json 
+// app.json
+    "expo": {
+        // ...
+        "plugins": [
+      [
+        "@turbopush/react-native-code-push/expo",
+        {
+          "ios": {
+            "CodePushDeploymentKey": "deployment key",
+            "CodePushServerURL": "server url"
+          },
+          "android": {
+            "CodePushDeploymentKey": "deployment key",
+            "CodePushServerURL": "server url "
+          }
+        }
+      ],
+    ]
+    }
+```
+
 
 ### Store Guideline Compliance
 
