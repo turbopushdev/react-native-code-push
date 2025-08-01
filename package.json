@@ -48,7 +48,6 @@
     "code-push": "4.2.3",
     "glob": "^7.1.7",
     "hoist-non-react-statics": "^3.3.2",
-    "inquirer": "^8.1.5",
     "plist": "^3.0.4",
     "semver": "^7.3.5",
     "xcode": "3.0.1"
@@ -81,10 +80,6 @@
       "sharedLibraries": [
         "libz"
       ]
-    },
-    "commands": {
-      "postlink": "node node_modules/@turbopush/react-native-code-push/scripts/postlink/run",
-      "postunlink": "node node_modules/@turbopush/react-native-code-push/scripts/postunlink/run"
     }
   },
   "bugs": {
