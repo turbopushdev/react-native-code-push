@@ -29,15 +29,13 @@
     },
     "plugins": [
       [
-        "@turbopush/react-native-code-push/expo",
+        "@turbopush/turbopush-expo-plugin",
         {
           "ios": {
             "CodePushDeploymentKey": "Tf2qo0NCNKloj8Ym2Z2Bk_VQ_zLDNzk2MGNjNDktNWFiZS00NTAwLWFlNDEtZjMzNzllNGU0MjE0",
-            "CodePushServerURL": "https://codepush.bitrise.io"
           },
           "android": {
             "CodePushDeploymentKey": "rUV0_iNflPqa3aJhVpciLnwgAFOaMzFiZjhhNDMtMGEyNS00NTk5LTk2ODEtOWU1NTcwODUwZTgx",
-            "CodePushServerURL": "https://codepush.bitrise.io"
           }
         }
       ],

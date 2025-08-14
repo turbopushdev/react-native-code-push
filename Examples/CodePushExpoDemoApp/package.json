@@ -9,7 +9,8 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@turbopush/react-native-code-push": "github:naveen-bitrise/react-native-code-push#expo-fix",
+    "@turbopush/react-native-code-push": "^10.2.3",
+    "@turbopush/turbopush-expo-plugin": "^1.0.0",
     "expo": "~53.0.10",
     "expo-build-properties": "^0.14.6",
     "expo-status-bar": "~2.2.3",
