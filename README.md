@@ -1,6 +1,6 @@
 # React Native Module for CodePush
-#### [Sign up](https://accounts.turbopush.org/sign-up) to use Turbopush
-#### [Documentation](https://docs.turbopush.org) to get started
+## 🚀 [Sign up](https://accounts.turbopush.org/sign-up) to use Turbopush
+## 📚 [Documentation](https://docs.turbopush.org) to get started
 
 This plugin provides client-side integration for the [Turbopush service](https://turbopush.org/), allowing you to easily add a dynamic update experience to your React Native or Expo app(s).
 
@@ -13,6 +13,62 @@ The Turbopush plugin helps get product improvements in front of your end users i
 In order to ensure that your end users always have a functioning version of your app, the Turbopush plugin maintains a copy of the previous update, so that in the event that you accidentally push an update which includes a crash, it can automatically roll back. This way, you can rest assured that your newfound release agility won't result in users becoming blocked before you have a chance to roll back on the server. It's a win-win-win!
 
 *Note: Any product changes which touch native code (e.g. modifying your `AppDelegate.mm`/`MainActivity.java`/`MainActivity.kt`/`AppDelegate.swift` file, adding a new plugin) cannot be distributed via Turbopush, and therefore, must be updated via the appropriate store(s).*
+
+## React Native Setup
+
+Yarn:
+```bash
+yarn add @turbopush/react-native-code-push
+```
+
+NPM:
+```bash
+npm install --save @turbopush/react-native-code-push
+```
+
+Follow the [Getting Started](https://docs.turbopush.org/?platform=react-native) guide to configure your app.
+
+## Expo Setup
+
+Yarn:
+```bash
+yarn add @turbopush/react-native-code-push @turbopush/turbopush-expo-plugin expo-build-properties
+```
+
+NPM:
+```bash
+npm install --save @turbopush/react-native-code-push @turbopush/turbopush-expo-plugin expo-build-properties
+```
+
+Add the following to your `app.json` or `app.config.ts` file:
+
+```json
+{
+  "plugins": [
+    [
+      "expo-build-properties",
+      {
+        "ios": {
+          "deploymentTarget": "15.5",
+        },
+      },
+    ],
+    [
+      "@turbopush/turbopush-expo-plugin",
+      {
+        "android": {
+          "CodePushDeploymentKey": "YOUR_ANDROID_CODE_PUSH_KEY",
+        },
+        "ios": {
+          "CodePushDeploymentKey": "YOUR_IOS_CODE_PUSH_KEY",
+        },
+      }
+    ]
+  ]
+}
+```
+
+For more information, see the [Getting Started](https://docs.turbopush.org/?platform=expo) guide.
 
 ## Key Features
 
