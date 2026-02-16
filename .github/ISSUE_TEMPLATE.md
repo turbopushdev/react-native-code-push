@@ -23,7 +23,7 @@ What actually happens?
 
 * react-native-code-push version:
 * react-native version:
-* iOS/Android/Windows version:
+* iOS/Android version:
 * Does this reproduce on a debug build or release build?
 * Does this reproduce on a simulator, or only on a physical device?
 
