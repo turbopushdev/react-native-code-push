@@ -45,13 +45,6 @@ android/**/*.iml
 android/.idea
 
 
-# Windows
-windows/.vs/
-windows/obj/
-
-#Tests
-windows/CodePush.Net46.Test
-
 #Visual Studio files
 *.[Oo]bj
 *.user
