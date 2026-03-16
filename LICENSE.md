@@ -1,5 +1,7 @@
-Microsoft CodePush Plugin for React Native
+Turbopush React Native Plugin for CodePush
+Copyright (c) Turbopush
 
+Based on Microsoft CodePush Plugin for React Native
 Copyright (c) Microsoft Corporation
 
 All rights reserved. 
