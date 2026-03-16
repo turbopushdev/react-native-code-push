@@ -1,9 +1,22 @@
 {
   "name": "@turbopush/react-native-code-push",
-  "version": "10.2.4",
+  "version": "10.2.6",
   "description": "React Native plugin for the CodePush service",
   "main": "CodePush.js",
   "typings": "typings/react-native-code-push.d.ts",
+  "files": [
+    "android/",
+    "ios/",
+    "scripts/",
+    "typings/",
+    "AlertAdapter.js",
+    "CodePush.js",
+    "CodePush.podspec",
+    "logging.js",
+    "package-mixins.js",
+    "react-native.config.js",
+    "request-fetch-adapter.js"
+  ],
   "homepage": "https://turbopush.org",
   "keywords": [
     "react-native",
