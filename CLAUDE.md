@@ -84,11 +84,6 @@ npm run clean         # Remove bin/ directory
   - Provides sync(), checkForUpdate(), getCurrentPackage(), etc.
   - Uses the Acquisition SDK for server communication
 
-- **[expo.js](expo.js)**: Expo config plugin that modifies native files during prebuild
-  - Adds CodePush imports to AppDelegate (iOS)
-  - Modifies bundleURL() to return CodePush bundle in production
-  - Configures Android MainApplication with CodePush
-
 - **[package-mixins.js](package-mixins.js)**: Utilities for package management (install, download, rollback)
 
 - **[request-fetch-adapter.js](request-fetch-adapter.js)**: HTTP adapter for the Acquisition SDK
