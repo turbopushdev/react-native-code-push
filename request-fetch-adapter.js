@@ -1,7 +1,21 @@
 const packageJson = require("./package.json");
+const { Platform } = require("react-native");
+
+const { major, minor, patch } = Platform.constants.reactNativeVersion;
+const rnVersion = `${major}.${minor}.${patch}`;
+
+let expoVersion;
+try {
+  expoVersion = require("expo/package.json").version;
+} catch (_) { }
+
+let turbopushExpoPluginVersion;
+try {
+  turbopushExpoPluginVersion = require("@turbopush/turbopush-expo-plugin/package.json").version;
+} catch (_) { }
 
 module.exports = {
-  async request(verb, url, requestBody, callback) {
+  request(verb, url, requestBody, callback) {
     if (typeof requestBody === "function") {
       callback = requestBody;
       requestBody = null;
@@ -12,26 +26,32 @@ module.exports = {
       "Content-Type": "application/json",
       "X-CodePush-Plugin-Name": packageJson.name,
       "X-CodePush-Plugin-Version": packageJson.version,
-      "X-CodePush-SDK-Version": packageJson.dependencies["code-push"]
+      "X-CodePush-SDK-Version": packageJson.dependencies["code-push"],
+      "X-React-Native-Version": rnVersion,
+      ...(expoVersion && { "X-Expo-Version": expoVersion }),
+      ...(turbopushExpoPluginVersion && { "X-Turbopush-Expo-Plugin-Version": turbopushExpoPluginVersion }),
     };
 
     if (requestBody && typeof requestBody === "object") {
       requestBody = JSON.stringify(requestBody);
     }
 
-    try {
-      const response = await fetch(url, {
-        method: getHttpMethodName(verb),
-        headers: headers,
-        body: requestBody
-      });
+    const xhr = new XMLHttpRequest();
+    xhr.open(getHttpMethodName(verb), url, true);
 
-      const statusCode = response.status;
-      const body = await response.text();
-      callback(null, { statusCode, body });
-    } catch (err) {
-      callback(err);
-    }
+    Object.entries(headers).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value);
+    });
+
+    xhr.onload = () => {
+      callback(null, { statusCode: xhr.status, body: xhr.responseText });
+    };
+
+    xhr.onerror = () => {
+      callback(new Error(`Network request failed for url ${url}`));
+    };
+
+    xhr.send(requestBody || null);
   }
 };
 

@@ -150,12 +150,20 @@ public class CodePushNativeModule extends BaseJavaModule {
                 latestJSBundleLoader = JSBundleLoader.createFileLoader(latestJSBundleFile);
             }
 
-            Field bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("jsBundleLoader");
+            // ExpoReactHostDelegate (Kotlin) exposes jsBundleLoader as a computed property whose
+            // backing field is named "_jsBundleLoader". Setting it makes the getter return the new
+            // loader on the next reload. Fall back to the non-prefixed name for other delegates.
+            Field bundleLoaderField;
+            try {
+                bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("_jsBundleLoader");
+            } catch (NoSuchFieldException ignored) {
+                bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("jsBundleLoader");
+            }
             bundleLoaderField.setAccessible(true);
             bundleLoaderField.set(reactHostDelegate, latestJSBundleLoader);
 
         } catch (NoSuchFieldException nsfe) {
-            CodePushUtils.log("Field 'jsBundleLoader' NOT FOUND on " + (reactHostDelegate != null ? reactHostDelegate.getClass().getName() : "null") + ". This is an EXPECTED and IGNORED failure with ExpoReactHostDelegate. Will rely on reactHost.reload(). Original log: Unable to set JSBundle of ReactHostDelegate - CodePush may not support this version of React Native");
+            CodePushUtils.log("Neither '_jsBundleLoader' nor 'jsBundleLoader' field found on " + (reactHostDelegate != null ? reactHostDelegate.getClass().getName() : "null") + ". Unable to update JS bundle for reload.");
             // DO NOT THROW for NoSuchFieldException.
         }catch (Exception e) {
             CodePushUtils.log("Unable to set JSBundle of ReactHostDelegate - CodePush may not support this version of React Native");
@@ -197,31 +205,26 @@ public class CodePushNativeModule extends BaseJavaModule {
 
      
                 try {
-                    if (reactHost instanceof ReactHostImpl) { 
-                        ReactHostDelegate delegate = getReactHostDelegate((ReactHostImpl) reactHost); 
+                    if (reactHost instanceof ReactHostImpl) {
+                        ReactHostDelegate delegate = getReactHostDelegate((ReactHostImpl) reactHost);
                         if (delegate != null) {
-                            // #2) Update the locally stored JS bundle file path
-                            setJSBundle(delegate, latestJSBundleFile); 
+                            // #2) Update the bundle loader on the delegate so the next reload uses it
+                            setJSBundle(delegate, latestJSBundleFile);
                         } else {
                             CodePushUtils.log("Could not get ReactHostDelegate from ReactHostImpl.");
                         }
                     } else {
-                        CodePushUtils.log("ReactHost is not a direct ReactHostImpl instance (" + reactHost.getClass().getName() + "), skipping direct setJSBundle reflection attempt. This is expected with Expo.");
+                        CodePushUtils.log("ReactHost is not ReactHostImpl (" + reactHost.getClass().getName() + ")");
                     }
-                } catch (ClassCastException cce) {
-                    CodePushUtils.log(new Exception("ClassCastException trying to get/use ReactHostDelegate. Skipping reflection call to setJSBundle. This is expected for Expo.", cce));
-                }catch (Exception e) {
-                    // Catch any unexpected errors from the attempt to call setJSBundle, e.g., if getReactHostDelegate itself fails
-                    CodePushUtils.log("Exception during the reflective setJSBundle block: " + e.getMessage());
+                } catch (Exception e) {
+                    CodePushUtils.log("Exception during setJSBundle: " + e.getMessage());
                 }
 
-                // #3) Get the context creation method
+                // #3) Trigger reload and initialize update state
                 try {
                     reactHost.reload("CodePush triggers reload");
                     mCodePush.initializeUpdateAfterRestart();
                 } catch (Exception e) {
-                    // The recreation method threw an unknown exception
-                    // so just simply fallback to restarting the Activity (if it exists)
                     loadBundleLegacy();
                 }
 
@@ -856,14 +859,23 @@ public class CodePushNativeModule extends BaseJavaModule {
     }
 
     public ReactHostDelegate getReactHostDelegate(ReactHostImpl reactHostImpl) {
+        // RN 0.76+ (used in Expo SDK 55+) names the field "reactHostDelegate" (Kotlin constructor
+        // property, no "m" prefix). Older versions used "mReactHostDelegate".
+        String[] candidateFields = {"reactHostDelegate", "mReactHostDelegate"};
         try {
             Class<?> clazz = reactHostImpl.getClass();
-            Field field = clazz.getDeclaredField("mReactHostDelegate");
-            field.setAccessible(true);
-
-            // Get the value of the field for the provided instance
-            return (ReactHostDelegate) field.get(reactHostImpl);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
+            for (String fieldName : candidateFields) {
+                try {
+                    Field field = clazz.getDeclaredField(fieldName);
+                    field.setAccessible(true);
+                    return (ReactHostDelegate) field.get(reactHostImpl);
+                } catch (NoSuchFieldException ignored) {
+                    // try next candidate
+                }
+            }
+            CodePushUtils.log("Could not find reactHostDelegate field on " + clazz.getName());
+            return null;
+        } catch (IllegalAccessException e) {
             e.printStackTrace();
             return null;
         }
