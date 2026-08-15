@@ -1,6 +1,6 @@
 {
   "name": "@turbopush/react-native-code-push",
-  "version": "10.3.0",
+  "version": "10.3.1",
   "description": "React Native plugin for the CodePush service",
   "main": "CodePush.js",
   "typings": "typings/react-native-code-push.d.ts",
@@ -29,29 +29,8 @@
   "scripts": {
     "clean": "shx rm -rf bin",
     "setup": "npm install --quiet --no-progress",
-    "prebuild:tests": "npm run clean && npm run tslint",
-    "build:tests": "tsc",
-    "test": "npm run build:tests && npm run test:setup && npm run test:fast",
-    "test:android": "npm run build:tests && npm run test:setup:android && npm run test:fast:android",
-    "test:ios": "npm run build:tests && npm run test:setup:ios && npm run test:fast:ios",
-    "test:expo:android": "npm run build:tests && npm run test:setup:expo:android && npm run test:fast:expo:android",
-    "test:expo:ios": "npm run build:tests && npm run test:setup:expo:ios && npm run test:fast:expo:ios",
-    "test:oldArch": "export TEST_OLD_ARCH=true && npm run build:tests && npm run test:setup && npm run test:fast",
-    "test:oldArch:android": "export TEST_OLD_ARCH=true && npm run build:tests && npm run test:setup:android && npm run test:fast:android",
-    "test:oldArch:ios": "export TEST_OLD_ARCH=true && npm run build:tests && npm run test:setup:ios && npm run test:fast:ios",
-    "test:setup": "mocha --recursive bin/test --android --ios --setup",
-    "test:setup:android": "mocha --recursive bin/test --android --setup",
-    "test:setup:ios": "mocha --recursive bin/test --ios --setup",
-    "test:setup:expo:android": "mocha --recursive bin/test --android --setup --expo",
-    "test:setup:expo:ios": "mocha --recursive bin/test --ios --setup --expo",
-    "test:fast": "mocha --recursive bin/test --android --ios",
-    "test:fast:android": "mocha --recursive bin/test --android",
-    "test:fast:ios": "mocha --recursive bin/test --ios",
-    "test:fast:expo:android": "mocha --recursive bin/test --android --expo",
-    "test:fast:expo:ios": "mocha --recursive bin/test --ios --expo",
-    "test:debugger:android": "mocha --recursive --inspect-brk=0.0.0.0 bin/test --android",
-    "test:debugger:ios": "mocha --recursive --inspect-brk=0.0.0.0 bin/test --ios",
-    "tslint": "tslint -c tslint.json test/**/*.ts"
+    "tslint": "tslint -c tslint.json test/**/*.ts",
+    "knip": "knip"
   },
   "repository": {
     "type": "git",
@@ -59,31 +38,14 @@
   },
   "dependencies": {
     "code-push": "4.2.3",
-    "glob": "^7.1.7",
-    "hoist-non-react-statics": "^3.3.2",
-    "plist": "^3.0.4",
-    "semver": "^7.3.5",
-    "xcode": "3.0.1"
+    "hoist-non-react-statics": "^3.3.2"
   },
   "devDependencies": {
-    "@types/assert": "^1.5.2",
-    "@types/mkdirp": "^1.0.1",
-    "@types/mocha": "^9.0.0",
-    "@types/node": "^14.0.27",
-    "@types/q": "^1.5.4",
-    "archiver": "latest",
-    "body-parser": "latest",
-    "code-push-plugin-testing-framework": "file:./code-push-plugin-testing-framework",
-    "del": "v6.0.0",
-    "express": "latest",
-    "mkdirp": "latest",
-    "mocha": "^9.2.0",
-    "q": "^1.5.1",
-    "run-sequence": "latest",
+    "@types/node": "14.18.63",
+    "knip": "6.32.2",
     "shx": "^0.3.4",
-    "slash": "^3.0.0",
     "tslint": "^6.1.3",
-    "typescript": "^4.4.3"
+    "typescript": "4.9.5"
   },
   "bugs": {
     "url": "https://github.com/turbopushdev/react-native-code-push/issues"

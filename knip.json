@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "tags": [
+    "-lintignore"
+  ],
+  "ignore": [
+    "scripts/**",
+    "react-native.config.js",
+    "package-mixins.js"
+  ],
+  "ignoreDependencies": [
+    "react-native",
+    "expo",
+    "@turbopush/turbopush-expo-plugin"
+  ]
+}
