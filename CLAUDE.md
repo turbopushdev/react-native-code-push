@@ -13,66 +13,16 @@ This is `@turbopush/react-native-code-push`, a React Native plugin for the Turbo
 npm install
 ```
 
-### Testing
+### Build
 
-Build and run all tests (Android + iOS):
 ```bash
-npm run test
+npm run build        # Compile TypeScript (src/ -> dist/)
 ```
 
-Platform-specific tests:
-```bash
-npm run test:android    # Android only
-npm run test:ios        # iOS only
-```
-
-Skip build and run tests directly:
-```bash
-npm run test:fast              # Both platforms
-npm run test:fast:android      # Android only
-npm run test:fast:ios          # iOS only
-```
-
-Old Architecture tests:
-```bash
-npm run test:oldArch           # Both platforms
-npm run test:oldArch:android   # Android only
-npm run test:oldArch:ios       # iOS only
-```
-
-Expo tests:
-```bash
-npm run test:expo:android      # Expo Android
-npm run test:expo:ios          # Expo iOS
-```
-
-Test with debugger (for debugging test failures):
-```bash
-npm run test:debugger:android  # Debug Android tests
-npm run test:debugger:ios      # Debug iOS tests
-```
-
-### Environment Variables for Tests
-
-- `ANDROID_EMU=yourEmulatorName` - Specify which Android emulator to use
-- `IOS_EMU="iPhone 15 (UUID)"` - Specify which iOS simulator to use
-- `CLEAN=true` - Always restart emulators (kills existing ones)
-- `CORE=true` - Run only core unit tests
-- `NPM=true` - Pull plugin from NPM instead of local version
-- `TEST_OLD_ARCH=true` - Test with React Native old architecture
-
-Example:
-```bash
-CLEAN=true npm run test:android
-CORE=true npm run test:ios
-```
-
-### Linting & Building
+### Dead code / dependency check
 
 ```bash
-npm run tslint        # Lint TypeScript test files
-npm run build:tests   # Compile TypeScript tests (test/ -> bin/)
-npm run clean         # Remove bin/ directory
+npm run knip         # Detect dead code and unused dependencies
 ```
 
 ## Architecture
@@ -87,6 +37,8 @@ npm run clean         # Remove bin/ directory
 - **[package-mixins.js](package-mixins.js)**: Utilities for package management (install, download, rollback)
 
 - **[request-fetch-adapter.js](request-fetch-adapter.js)**: HTTP adapter for the Acquisition SDK
+
+- **[src/acquisition-sdk/](src/acquisition-sdk/)**: Vendored Acquisition SDK (TypeScript source, compiled to `dist/`)
 
 ### Native Modules
 
@@ -104,28 +56,12 @@ npm run clean         # Remove bin/ directory
 - `CodePushDownloadHandler.m` - Download progress and management
 - Third-party dependencies: JWT (token verification), SSZipArchive (unzipping), Base64
 
-### Testing Framework
-
-**Custom Testing Framework** ([code-push-plugin-testing-framework/](code-push-plugin-testing-framework/)):
-- Abstraction for running end-to-end tests on Android/iOS emulators
-- Handles emulator/simulator management (boot, restart, install apps)
-- Sets up test servers for mock CodePush updates
-- Defined in [test/test.ts](test/test.ts) with scenarios for various update flows
-
-**Example Apps** ([Examples/](Examples/)):
-- `CodePushDemoApp` - Standard React Native app
-- `CodePushDemoAppNewArch` - New Architecture (Fabric/TurboModules)
-- `CodePushDemoSwiftNewArch` - New Architecture with Swift
-- `CodePushDemoAppCpp` - C++ TurboModule example
-- `CodePushExpoDemoApp` - Expo application
-- Used by the test suite to validate plugin functionality
-
 ### Build Configuration
 
 - **[react-native.config.js](react-native.config.js)**: React Native CLI autolinking config
 - **[CodePush.podspec](CodePush.podspec)**: CocoaPods spec for iOS
 - **[android/build.gradle](android/build.gradle)**: Android library configuration
-- **[tsconfig.json](tsconfig.json)**: TypeScript compiler for test suite
+- **[tsconfig.json](tsconfig.json)**: Compiles the vendored acquisition SDK (`src/`) into `dist/`
 
 ### Scripts
 
@@ -159,6 +95,4 @@ npm run clean         # Remove bin/ directory
 
 - Native code changes (AppDelegate, MainActivity, etc.) cannot be distributed via CodePush
 - The plugin supports both React Native old and new architecture (Fabric/TurboModules)
-- Tests require Android SDK tools and iOS CocoaPods to be installed
-- Tests automatically boot emulators if they're not running
 - The main branch should be used for PRs (main branch: main)

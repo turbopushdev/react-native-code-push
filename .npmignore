@@ -34,9 +34,6 @@ Recipes/
 bin/
 test/
 
-# Remove after this framework is published on NPM
-code-push-plugin-testing-framework/
-
 # Android build artifacts and Android Studio bits
 android/app/build
 android/local.properties

@@ -30,7 +30,8 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "knip": "knip"
+    "knip": "knip",
+    "knip:fix": "npm run knip -- --fix --allow-remove-files"
   },
   "repository": {
     "type": "git",

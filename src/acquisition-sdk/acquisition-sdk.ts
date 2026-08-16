@@ -1,7 +1,7 @@
 import type { UpdateCheckResponse, UpdateCheckRequest, DeploymentStatusReport, DownloadReport } from "./types";
 import { CodePushHttpError, CodePushDeployStatusError, CodePushPackageError } from "./code-push-error"
 
-export module Http {
+module Http {
     export const enum Verb {
         GET, HEAD, POST, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATCH
     }
@@ -38,10 +38,6 @@ export interface NativeUpdateNotification {
     appVersion: string;
 }
 
-export interface LocalPackage extends Package {
-    localPath: string;
-}
-
 export interface Callback<T> { (error: Error, parameter: T): void; }
 
 export interface Configuration {
@@ -52,7 +48,7 @@ export interface Configuration {
     ignoreAppVersion?: boolean
 }
 
-export class AcquisitionStatus {
+class AcquisitionStatus {
     public static DeploymentSucceeded = "DeploymentSucceeded";
     public static DeploymentFailed = "DeploymentFailed";
 }
