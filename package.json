@@ -9,6 +9,7 @@
     "ios/",
     "scripts/",
     "typings/",
+    "dist/",
     "AlertAdapter.js",
     "CodePush.js",
     "CodePush.podspec",
@@ -27,9 +28,8 @@
   "author": "Turbopush",
   "license": "MIT",
   "scripts": {
-    "clean": "shx rm -rf bin",
-    "setup": "npm install --quiet --no-progress",
-    "tslint": "tslint -c tslint.json test/**/*.ts",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "knip": "knip"
   },
   "repository": {
@@ -37,15 +37,12 @@
     "url": "git+https://github.com/turbopushdev/react-native-code-push.git"
   },
   "dependencies": {
-    "code-push": "4.2.3",
     "hoist-non-react-statics": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "14.18.63",
     "knip": "6.32.2",
-    "shx": "^0.3.4",
-    "tslint": "^6.1.3",
-    "typescript": "4.9.5"
+    "typescript": "5.4.5"
   },
   "bugs": {
     "url": "https://github.com/turbopushdev/react-native-code-push/issues"

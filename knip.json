@@ -5,6 +5,7 @@
   ],
   "ignore": [
     "scripts/**",
+    "src/acquisition-sdk/**",
     "react-native.config.js",
     "package-mixins.js"
   ],
