@@ -26,7 +26,6 @@ module.exports = {
       "Content-Type": "application/json",
       "X-CodePush-Plugin-Name": packageJson.name,
       "X-CodePush-Plugin-Version": packageJson.version,
-      "X-CodePush-SDK-Version": packageJson.dependencies["code-push"],
       "X-React-Native-Version": rnVersion,
       ...(expoVersion && { "X-Expo-Version": expoVersion }),
       ...(turbopushExpoPluginVersion && { "X-Turbopush-Expo-Plugin-Version": turbopushExpoPluginVersion }),
