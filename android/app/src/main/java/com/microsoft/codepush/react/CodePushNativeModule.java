@@ -153,11 +153,23 @@ public class CodePushNativeModule extends BaseJavaModule {
             // ExpoReactHostDelegate (Kotlin) exposes jsBundleLoader as a computed property whose
             // backing field is named "_jsBundleLoader". Setting it makes the getter return the new
             // loader on the next reload. Fall back to the non-prefixed name for other delegates.
-            Field bundleLoaderField;
+            Field bundleLoaderField = null;
             try {
                 bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("_jsBundleLoader");
             } catch (NoSuchFieldException ignored) {
-                bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("jsBundleLoader");
+                try {
+                    bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("jsBundleLoader");
+                } catch (NoSuchFieldException ignored2) {
+                    for (Field field : reactHostDelegate.getClass().getDeclaredFields()) {
+                        if (JSBundleLoader.class.isAssignableFrom(field.getType())) {
+                            bundleLoaderField = field;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (bundleLoaderField == null) {
+                throw new NoSuchFieldException("No JSBundleLoader field found on " + reactHostDelegate.getClass().getName());
             }
             bundleLoaderField.setAccessible(true);
             bundleLoaderField.set(reactHostDelegate, latestJSBundleLoader);
@@ -871,6 +883,12 @@ public class CodePushNativeModule extends BaseJavaModule {
                     return (ReactHostDelegate) field.get(reactHostImpl);
                 } catch (NoSuchFieldException ignored) {
                     // try next candidate
+                }
+            }
+            for (Field field : clazz.getDeclaredFields()) {
+                if (ReactHostDelegate.class.isAssignableFrom(field.getType())) {
+                    field.setAccessible(true);
+                    return (ReactHostDelegate) field.get(reactHostImpl);
                 }
             }
             CodePushUtils.log("Could not find reactHostDelegate field on " + clazz.getName());
