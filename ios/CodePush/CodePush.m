@@ -68,6 +68,13 @@ static NSString *const PackageIsPendingKey = @"isPending";
 #pragma mark - Static variables
 
 static BOOL isRunningBinaryVersion = NO;
+// Hash of the pending update observed when this process started. A lifecycle
+// event only marks an update that was already pending then; one installed in
+// this session has not been applied yet.
+static NSString *pendingUpdateAtProcessStart = nil;
+// Hash of the pending update marked as loading by this process. Nil on every
+// process start, so only a reload started here (e.g. restartApp) skips rollback.
+static NSString *pendingUpdateMarkedLoadingThisProcess = nil;
 static BOOL needToReportRollback = NO;
 static BOOL testConfigurationFlag = NO;
 
@@ -381,6 +388,17 @@ static NSString *const LatestRollbackCountKey = @"count";
     self = [super init];
     if (self) {
         [self initializeUpdateAfterRestart];
+
+        // Mark right away if the app is already active; otherwise wait for didBecomeActive.
+        // Background launches must not consume the update.
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(markPendingUpdateLoadingIfShown)
+                                                     name:UIApplicationDidBecomeActiveNotification
+                                                   object:nil];
+        UIApplication *application = RCTSharedApplication();
+        if (application && application.applicationState == UIApplicationStateActive) {
+            [self markPendingUpdateLoadingIfShown];
+        }
     }
 
     return self;
@@ -400,21 +418,63 @@ static NSString *const LatestRollbackCountKey = @"count";
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
     if (pendingUpdate) {
+        NSString *pendingHash = pendingUpdate[PendingUpdateHashKey];
+        pendingUpdateAtProcessStart = pendingHash;
         _isFirstRunAfterUpdate = YES;
         BOOL updateIsLoading = [pendingUpdate[PendingUpdateIsLoadingKey] boolValue];
-        if (updateIsLoading) {
+        BOOL markedLoadingByThisProcess = pendingHash &&
+            [pendingHash isEqualToString:pendingUpdateMarkedLoadingThisProcess];
+        if (updateIsLoading && !markedLoadingByThisProcess) {
             // Pending update was initialized, but notifyApplicationReady was not called.
             // Therefore, deduce that it is a broken update and rollback.
             CPLog(@"Update did not finish loading the last time, rolling back to a previous version.");
             needToReportRollback = YES;
             [self rollbackPackage];
-        } else {
-            // Mark that we tried to initialize the new update, so that if it crashes,
-            // we will know that we need to rollback when the app next starts.
-            [self savePendingUpdate:pendingUpdate[PendingUpdateHashKey]
-                          isLoading:YES];
         }
+        // Otherwise this is a first run or an in-process reload; isLoading is set
+        // in markPendingUpdateLoadingIfNeeded.
     }
+}
+
+/*
+ * Marks the pending update as loading when the bundle is reloaded (e.g. restartApp).
+ * Process creation alone must not consume it.
+ */
+- (void)markPendingUpdateLoadingIfNeeded
+{
+    [self markPendingUpdateLoading:NO];
+}
+
+/*
+ * Marks the pending update once the app is shown. Only an update that was already
+ * pending when the process started qualifies; one installed in this session has not
+ * been applied yet.
+ */
+- (void)markPendingUpdateLoadingIfShown
+{
+    [self markPendingUpdateLoading:YES];
+}
+
+- (void)markPendingUpdateLoading:(BOOL)requirePendingAtProcessStart
+{
+    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
+    NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
+    if (!pendingUpdate) {
+        return;
+    }
+
+    NSString *pendingHash = pendingUpdate[PendingUpdateHashKey];
+    if (!pendingHash ||
+        [pendingHash isEqualToString:pendingUpdateMarkedLoadingThisProcess] ||
+        (requirePendingAtProcessStart && ![pendingHash isEqualToString:pendingUpdateAtProcessStart]) ||
+        ![[self class] isPendingUpdate:pendingHash]) {
+        // Nothing pending, already marked by this process, installed in this session,
+        // or hash mismatch.
+        return;
+    }
+
+    [self savePendingUpdate:pendingHash isLoading:YES];
+    pendingUpdateMarkedLoadingThisProcess = pendingHash;
 }
 
 /*
@@ -530,6 +590,9 @@ static NSString *const LatestRollbackCountKey = @"count";
  */
 - (void)loadBundle
 {
+    // An explicit reload also runs the pending update (e.g. InstallModeIMMEDIATE).
+    [self markPendingUpdateLoadingIfNeeded];
+
     // This needs to be async dispatched because the bridge is not set on init
     // when the app first starts, therefore rollbacks will not take effect.
     dispatch_async(dispatch_get_main_queue(), ^{
