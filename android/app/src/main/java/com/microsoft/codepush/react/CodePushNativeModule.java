@@ -168,6 +168,9 @@ public class CodePushNativeModule extends BaseJavaModule {
     }
 
     private void loadBundle() {
+        // An explicit reload also runs the pending update (e.g. InstallMode.IMMEDIATE).
+        mCodePush.markPendingUpdateLoadingThisProcess();
+
         clearLifecycleEventListener();
 
         // ReactNative core components are changed on new architecture.
