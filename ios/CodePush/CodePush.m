@@ -68,6 +68,14 @@ static NSString *const PackageIsPendingKey = @"isPending";
 #pragma mark - Static variables
 
 static BOOL isRunningBinaryVersion = NO;
+// Hash of the pending update observed on the first bundle resolution of this
+// process. Lifecycle and bundle events only mark an update that was already
+// pending then; one installed in this session has not been applied yet.
+static NSString *pendingUpdateAtProcessStart = nil;
+static BOOL pendingUpdateAtProcessStartInitialized = NO;
+// Hash of the pending update marked as loading by this process. Nil on every
+// process start, so only a reload started here (e.g. restartApp) skips rollback.
+static NSString *pendingUpdateMarkedLoadingThisProcess = nil;
 static BOOL needToReportRollback = NO;
 static BOOL testConfigurationFlag = NO;
 
@@ -157,6 +165,9 @@ static NSString *const LatestRollbackCountKey = @"count";
     bundleResourceSubdirectory = resourceSubdirectory;
     bundleResourceBundle = resourceBundle;
 
+    // Capture the pending update this process started with before any bundle runs.
+    [self latchPendingUpdateAtProcessStart];
+
     [self ensureBinaryBundleExists];
 
     NSString *logMessageFormat = @"Loading JS bundle from %@";
@@ -185,6 +196,12 @@ static NSString *const LatestRollbackCountKey = @"count";
     if ([[CodePushUpdateUtils modifiedDateStringOfFileAtURL:binaryBundleURL] isEqualToString:packageDate] && ([CodePush isUsingTestConfiguration] ||[binaryAppVersion isEqualToString:packageAppVersion])) {
         // Return package file because it is newer than the app store binary's JS bundle
         NSURL *packageUrl = [[NSURL alloc] initFileURLWithPath:packageFile];
+        // Foreground launches mark the update as loading as soon as the bundle is
+        // handed to React; background launches must not consume it.
+        UIApplication *application = RCTSharedApplication();
+        if (!application || application.applicationState != UIApplicationStateBackground) {
+            [self markPendingUpdateLoadingIfShown];
+        }
         CPLog(logMessageFormat, packageUrl);
         isRunningBinaryVersion = NO;
         return packageUrl;
@@ -381,6 +398,17 @@ static NSString *const LatestRollbackCountKey = @"count";
     self = [super init];
     if (self) {
         [self initializeUpdateAfterRestart];
+
+        // Mark right away if the app is already active; otherwise wait for didBecomeActive.
+        // Background launches must not consume the update.
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(applicationDidBecomeActiveMarkPendingUpdate)
+                                                     name:UIApplicationDidBecomeActiveNotification
+                                                   object:nil];
+        UIApplication *application = RCTSharedApplication();
+        if (application && application.applicationState == UIApplicationStateActive) {
+            [CodePush markPendingUpdateLoadingIfShown];
+        }
     }
 
     return self;
@@ -396,25 +424,86 @@ static NSString *const LatestRollbackCountKey = @"count";
 #ifdef DEBUG
     [self clearDebugUpdates];
 #endif
+    [CodePush latchPendingUpdateAtProcessStart];
     self.paused = YES;
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
     if (pendingUpdate) {
+        NSString *pendingHash = pendingUpdate[PendingUpdateHashKey];
         _isFirstRunAfterUpdate = YES;
         BOOL updateIsLoading = [pendingUpdate[PendingUpdateIsLoadingKey] boolValue];
-        if (updateIsLoading) {
+        BOOL markedLoadingByThisProcess = pendingHash &&
+            [pendingHash isEqualToString:pendingUpdateMarkedLoadingThisProcess];
+        if (updateIsLoading && !markedLoadingByThisProcess) {
             // Pending update was initialized, but notifyApplicationReady was not called.
             // Therefore, deduce that it is a broken update and rollback.
             CPLog(@"Update did not finish loading the last time, rolling back to a previous version.");
             needToReportRollback = YES;
             [self rollbackPackage];
-        } else {
-            // Mark that we tried to initialize the new update, so that if it crashes,
-            // we will know that we need to rollback when the app next starts.
-            [self savePendingUpdate:pendingUpdate[PendingUpdateHashKey]
-                          isLoading:YES];
         }
+        // Otherwise this is a first run or an in-process reload; isLoading is set
+        // in markPendingUpdateLoadingIfShown when the bundle is handed to React.
     }
+}
+
+/*
+ * Captures the pending update this process started with, on the first bundle
+ * resolution. A bridge re-created later in the process must not reset it.
+ */
++ (void)latchPendingUpdateAtProcessStart
+{
+    if (pendingUpdateAtProcessStartInitialized) {
+        return;
+    }
+    pendingUpdateAtProcessStartInitialized = YES;
+    NSDictionary *pendingUpdate = [[NSUserDefaults standardUserDefaults] objectForKey:PendingUpdateKey];
+    pendingUpdateAtProcessStart = pendingUpdate[PendingUpdateHashKey];
+}
+
+/*
+ * Marks the pending update as loading when the bundle is reloaded (e.g. restartApp).
+ * Process creation alone must not consume it.
+ */
++ (void)markPendingUpdateLoadingOnReload
+{
+    [self markPendingUpdateLoading:NO];
+}
+
+/*
+ * Marks the pending update once the app is shown. Only an update that was already
+ * pending when the process started qualifies; one installed in this session has not
+ * been applied yet.
+ */
++ (void)markPendingUpdateLoadingIfShown
+{
+    [self markPendingUpdateLoading:YES];
+}
+
++ (void)markPendingUpdateLoading:(BOOL)requirePendingAtProcessStart
+{
+    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
+    NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
+    if (!pendingUpdate) {
+        return;
+    }
+
+    NSString *pendingHash = pendingUpdate[PendingUpdateHashKey];
+    if (!pendingHash ||
+        [pendingHash isEqualToString:pendingUpdateMarkedLoadingThisProcess] ||
+        (requirePendingAtProcessStart && ![pendingHash isEqualToString:pendingUpdateAtProcessStart]) ||
+        ![self isPendingUpdate:pendingHash]) {
+        // Nothing pending, already marked by this process, installed in this session,
+        // or hash mismatch.
+        return;
+    }
+
+    [self savePendingUpdate:pendingHash isLoading:YES];
+    pendingUpdateMarkedLoadingThisProcess = pendingHash;
+}
+
+- (void)applicationDidBecomeActiveMarkPendingUpdate
+{
+    [CodePush markPendingUpdateLoadingIfShown];
 }
 
 /*
@@ -530,6 +619,9 @@ static NSString *const LatestRollbackCountKey = @"count";
  */
 - (void)loadBundle
 {
+    // An explicit reload also runs the pending update (e.g. InstallModeIMMEDIATE).
+    [CodePush markPendingUpdateLoadingOnReload];
+
     // This needs to be async dispatched because the bridge is not set on init
     // when the app first starts, therefore rollbacks will not take effect.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -626,7 +718,7 @@ static NSString *const LatestRollbackCountKey = @"count";
  * can be called to store the pending update's metadata (e.g. packageHash)
  * so that it can be used when the actual update application occurs at a later point.
  */
-- (void)savePendingUpdate:(NSString *)packageHash
++ (void)savePendingUpdate:(NSString *)packageHash
                 isLoading:(BOOL)isLoading
 {
     // Since we're not restarting, we need to store the fact that the update
@@ -899,8 +991,8 @@ RCT_EXPORT_METHOD(installUpdate:(NSDictionary*)updatePackage
     if (error) {
         reject([NSString stringWithFormat: @"%lu", (long)error.code], error.localizedDescription, error);
     } else {
-        [self savePendingUpdate:updatePackage[PackageHashKey]
-                      isLoading:NO];
+        [CodePush savePendingUpdate:updatePackage[PackageHashKey]
+                          isLoading:NO];
 
         _installMode = installMode;
         if (_installMode == CodePushInstallModeOnNextResume || _installMode == CodePushInstallModeOnNextSuspend) {
