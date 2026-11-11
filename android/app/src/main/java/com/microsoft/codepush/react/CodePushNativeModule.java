@@ -153,19 +153,15 @@ public class CodePushNativeModule extends BaseJavaModule {
             // ExpoReactHostDelegate (Kotlin) exposes jsBundleLoader as a computed property whose
             // backing field is named "_jsBundleLoader". Setting it makes the getter return the new
             // loader on the next reload. Fall back to the non-prefixed name for other delegates.
-            Field bundleLoaderField;
-            try {
-                bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("_jsBundleLoader");
-            } catch (NoSuchFieldException ignored) {
-                bundleLoaderField = reactHostDelegate.getClass().getDeclaredField("jsBundleLoader");
-            }
-            bundleLoaderField.setAccessible(true);
-            bundleLoaderField.set(reactHostDelegate, latestJSBundleLoader);
+            boolean updated = ReflectionUtils.trySetFieldValue(
+                    reactHostDelegate, latestJSBundleLoader, "_jsBundleLoader", "jsBundleLoader");
 
-        } catch (NoSuchFieldException nsfe) {
-            CodePushUtils.log("Neither '_jsBundleLoader' nor 'jsBundleLoader' field found on " + (reactHostDelegate != null ? reactHostDelegate.getClass().getName() : "null") + ". Unable to update JS bundle for reload.");
-            // DO NOT THROW for NoSuchFieldException.
-        }catch (Exception e) {
+            if (!updated) {
+                CodePushUtils.log("No JSBundleLoader field found on " + reactHostDelegate.getClass().getName() + ". Unable to update JS bundle for reload.");
+                // DO NOT THROW when the field cannot be written.
+            }
+
+        } catch (Exception e) {
             CodePushUtils.log("Unable to set JSBundle of ReactHostDelegate - CodePush may not support this version of React Native");
             throw new IllegalAccessException("Could not setJSBundle");
         }
@@ -861,23 +857,12 @@ public class CodePushNativeModule extends BaseJavaModule {
     public ReactHostDelegate getReactHostDelegate(ReactHostImpl reactHostImpl) {
         // RN 0.76+ (used in Expo SDK 55+) names the field "reactHostDelegate" (Kotlin constructor
         // property, no "m" prefix). Older versions used "mReactHostDelegate".
-        String[] candidateFields = {"reactHostDelegate", "mReactHostDelegate"};
-        try {
-            Class<?> clazz = reactHostImpl.getClass();
-            for (String fieldName : candidateFields) {
-                try {
-                    Field field = clazz.getDeclaredField(fieldName);
-                    field.setAccessible(true);
-                    return (ReactHostDelegate) field.get(reactHostImpl);
-                } catch (NoSuchFieldException ignored) {
-                    // try next candidate
-                }
-            }
-            CodePushUtils.log("Could not find reactHostDelegate field on " + clazz.getName());
-            return null;
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-            return null;
+        ReactHostDelegate delegate = ReflectionUtils.tryGetFieldValue(
+                reactHostImpl, ReactHostDelegate.class, "reactHostDelegate", "mReactHostDelegate");
+
+        if (delegate == null) {
+            CodePushUtils.log("Could not find reactHostDelegate field on " + reactHostImpl.getClass().getName());
         }
+        return delegate;
     }
 }
