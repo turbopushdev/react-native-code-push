@@ -1,9 +1,12 @@
 package com.microsoft.codepush.react;
 
+import android.app.Activity;
+import android.app.Application;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.os.Bundle;
 
 import com.facebook.react.ReactHost;
 import com.facebook.react.ReactInstanceManager;
@@ -35,6 +38,14 @@ public class CodePush implements ReactPackage {
     }
 
     private static boolean sIsRunningBinaryVersion = false;
+    // Hash of the pending update observed when this process started. A lifecycle
+    // event only marks an update that was already pending then; one installed in
+    // this session has not been applied yet.
+    private static String sPendingUpdateAtProcessStart = null;
+    // Hash of the pending update marked as loading by this process. Null on every
+    // process start, so only an in-process reload (e.g. restartApp) skips rollback.
+    private static String sPendingUpdateMarkedLoadingHash = null;
+    private static boolean sActivityLifecycleCallbacksRegistered = false;
     private static boolean sNeedToReportRollback = false;
     private static boolean sTestConfigurationFlag = false;
     private static String sAppVersion = null;
@@ -98,6 +109,7 @@ public class CodePush implements ReactPackage {
         // ignore liveReload when CodePush is initializing so that unneccessary cache could be cleared
         clearDebugCacheIfNeeded(false);
         initializeUpdateAfterRestart();
+        registerActivityLifecycleCallbacks();
     }
 
     private CodePush(String deploymentKey, Context context, boolean isDebugMode, String serverUrl) {
@@ -286,6 +298,8 @@ public class CodePush implements ReactPackage {
 
         JSONObject pendingUpdate = mSettingsManager.getPendingUpdate();
         if (pendingUpdate != null) {
+            String pendingHash = pendingUpdate.optString(CodePushConstants.PENDING_UPDATE_HASH_KEY, null);
+            sPendingUpdateAtProcessStart = pendingHash;
             JSONObject packageMetadata = null;
 
             try {
@@ -303,7 +317,10 @@ public class CodePush implements ReactPackage {
 
             try {
                 boolean updateIsLoading = pendingUpdate.getBoolean(CodePushConstants.PENDING_UPDATE_IS_LOADING_KEY);
-                if (updateIsLoading) {
+                // A hash marked by this process means an in-process reload, not a crash.
+                boolean markedLoadingByThisProcess = pendingHash != null &&
+                        pendingHash.equals(sPendingUpdateMarkedLoadingHash);
+                if (updateIsLoading && !markedLoadingByThisProcess) {
                     // Pending update was initialized, but notifyApplicationReady was not called.
                     // Therefore, deduce that it is a broken update and rollback.
                     CodePushUtils.log("Update did not finish loading the last time, rolling back to a previous version.");
@@ -313,17 +330,108 @@ public class CodePush implements ReactPackage {
                     // There is in fact a new update running for the first
                     // time, so update the local state to ensure the client knows.
                     mDidUpdate = true;
-
-                    // Mark that we tried to initialize the new update, so that if it crashes,
-                    // we will know that we need to rollback when the app next starts.
-                    mSettingsManager.savePendingUpdate(pendingUpdate.getString(CodePushConstants.PENDING_UPDATE_HASH_KEY),
-                            /* isLoading */true);
                 }
             } catch (JSONException e) {
                 // Should not happen.
                 throw new CodePushUnknownException("Unable to read pending update metadata stored in SharedPreferences", e);
             }
         }
+    }
+
+    /** Marks the pending update once the app is actually shown (Activities only). */
+    private void registerActivityLifecycleCallbacks() {
+        if (sActivityLifecycleCallbacksRegistered || !(mContext instanceof Application)) {
+            return;
+        }
+
+        sActivityLifecycleCallbacksRegistered = true;
+        ((Application) mContext).registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+                markPendingUpdateLoadingIfShown();
+            }
+
+            @Override
+            public void onActivityStarted(Activity activity) {
+                // Covers hosts that create this instance after the first onActivityCreated.
+                markPendingUpdateLoadingIfShown();
+            }
+
+            @Override
+            public void onActivityResumed(Activity activity) {
+            }
+
+            @Override
+            public void onActivityPaused(Activity activity) {
+            }
+
+            @Override
+            public void onActivityStopped(Activity activity) {
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
+            }
+
+            @Override
+            public void onActivityDestroyed(Activity activity) {
+            }
+        });
+    }
+
+    /**
+     * Marks the pending update as loading when the app is shown or the bundle is
+     * reloaded. Process creation alone (push receiver, job, headless task) must not
+     * consume it.
+     */
+    void markPendingUpdateLoadingThisProcess() {
+        markPendingUpdateLoading(false);
+    }
+
+    /**
+     * Marks the pending update once the app is shown. Only an update that was already
+     * pending when the process started qualifies; one installed in this session has not
+     * been applied yet.
+     */
+    private void markPendingUpdateLoadingIfShown() {
+        markPendingUpdateLoading(true);
+    }
+
+    /**
+     * Marks the pending update as loading when the app is shown or the bundle is
+     * reloaded. Process creation alone (push receiver, job, headless task) must not
+     * consume it.
+     */
+    private void markPendingUpdateLoading(boolean requirePendingAtProcessStart) {
+        JSONObject pendingUpdate = mSettingsManager.getPendingUpdate();
+        if (pendingUpdate == null) {
+            return;
+        }
+
+        String pendingHash = pendingUpdate.optString(CodePushConstants.PENDING_UPDATE_HASH_KEY, null);
+        if (pendingHash == null ||
+                pendingHash.equals(sPendingUpdateMarkedLoadingHash) ||
+                (requirePendingAtProcessStart && !pendingHash.equals(sPendingUpdateAtProcessStart)) ||
+                !mSettingsManager.isPendingUpdate(pendingHash)) {
+            // Nothing pending, already marked by this process, installed in this session,
+            // or hash mismatch.
+            return;
+        }
+
+        try {
+            JSONObject packageMetadata = mUpdateManager.getCurrentPackage();
+            if (packageMetadata == null ||
+                    !isPackageBundleLatest(packageMetadata) ||
+                    !pendingHash.equals(packageMetadata.optString("packageHash"))) {
+                // The pending update is not the bundle that will run.
+                return;
+            }
+        } catch (CodePushMalformedDataException e) {
+            return;
+        }
+
+        mSettingsManager.savePendingUpdate(pendingHash, /* isLoading */ true);
+        sPendingUpdateMarkedLoadingHash = pendingHash;
     }
 
     void invalidateCurrentInstance() {
